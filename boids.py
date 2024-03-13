@@ -150,11 +150,21 @@ class Particle:
 
 
 def plot_order(orders):
+    mean = np.mean(orders, axis=0)
+    std = np.std(orders, axis=0)
+
+    # plot the individual runs
     for order in orders:
-        plt.plot(list(range(len(order))), order)
+        plt.plot(order, color='grey', alpha=0.30)
+
+    # plot the mean and std
+    plt.plot(mean, label='mean', color='tab:red')
+    plt.fill_between(np.arange(0, len(orders[0])), mean - std, mean + std, alpha=0.30, label='std', color='tab:red')
 
     plt.xlabel('step')
     plt.ylabel('average normalized velocity')
+
+    plt.legend()
 
     plt.savefig('results/test.png')
     plt.show()
