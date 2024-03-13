@@ -1,7 +1,7 @@
 import matplotlib.pyplot as plt
 import numpy as np
 import pygame
-
+import multiprocessing as mp
 
 
 class Scene:
@@ -20,6 +20,9 @@ class Scene:
         self.alignment = alignment
         self.speed = speed
         self.interaction_radius_squared = interaction_radius**2
+
+        # initialize swarm
+        self.swarm = np.array([Particle(self.w, self.h) for _ in range(self.N)])
 
         # initialize gui related info
         self.gui = gui
@@ -65,10 +68,7 @@ class Scene:
             [particle.dir.normalize() for particle in self.swarm], pygame.Vector2(0, 0)
         ).magnitude() / self.N
 
-    def run(self, num_steps=300):
-        # initialize swarm
-        self.swarm = np.array([Particle(self.w, self.h) for _ in range(self.N)])
-
+    def run(self, num_steps=300, process_id=None, results=None):
         interrupt = False
         step = 0
 
@@ -88,6 +88,10 @@ class Scene:
             step += 1
 
         if self.gui: pygame.quit()
+
+        if process_id is not None:
+            results[process_id] = orders
+            return
 
         return orders
 
@@ -156,16 +160,39 @@ def plot_order(orders):
     plt.show()
 
 
+def run_repeated(
+    w, h, N, cohesion, seperation, alignment, speed, interaction_radius,
+    gui=True, fps=30, draw_size=5, num_steps=300, repetitions=mp.cpu_count(),
+):
+    manager = mp.Manager()
+    results = manager.dict()
+    jobs = []
+
+    scenes = [
+        Scene(
+            w=600, h=600, N=200, cohesion=100, seperation=30, alignment=1, speed=5, interaction_radius=100,
+            gui=False, fps=30
+        ) for _ in range(repetitions)
+    ]
+
+    for process_id in range(repetitions):
+        process = mp.Process(target=scenes[process_id].run, args=(num_steps, process_id, results))
+        jobs.append(process)
+        process.start()
+
+    for process in jobs:
+        process.join()
+
+    return results.values()
+
+
 def main():
     np.random.seed(0)  # for reproducability
 
-    scene = Scene(
+    orders = run_repeated(
         w=600, h=600, N=200, cohesion=100, seperation=30, alignment=1, speed=5, interaction_radius=100,
         gui=False, fps=30
     )
-
-    repetitions = 10
-    orders = [scene.run() for _ in range(10)]
     plot_order(orders)
 
 
