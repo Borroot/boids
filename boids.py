@@ -1,5 +1,7 @@
+import matplotlib.pyplot as plt
 import numpy as np
 import pygame
+
 
 
 class Scene:
@@ -18,9 +20,6 @@ class Scene:
         self.alignment = alignment
         self.speed = speed
         self.interaction_radius_squared = interaction_radius**2
-
-        # initialize swarm
-        self.swarm = np.array([Particle(w, h) for _ in range(N)])
 
         # initialize gui related info
         self.gui = gui
@@ -50,6 +49,7 @@ class Scene:
             pygame.draw.circle(self.screen, (0, 0, 0), particle.pos, self.draw_size)
 
         pygame.display.flip()
+        self.fps_limiter.tick(self.fps)
 
     def check_interrupt(self):
         for event in pygame.event.get():
@@ -60,9 +60,19 @@ class Scene:
                     return True
         return False
 
+    def order(self):
+        return sum(
+            [particle.dir.normalize() for particle in self.swarm], pygame.Vector2(0, 0)
+        ).magnitude() / self.N
+
     def run(self, num_steps=300):
+        # initialize swarm
+        self.swarm = np.array([Particle(self.w, self.h) for _ in range(self.N)])
+
         interrupt = False
         step = 0
+
+        orders = []
 
         while step < num_steps and not interrupt:
             # the user interrupted the run
@@ -70,15 +80,16 @@ class Scene:
 
             # update the scene
             self.step()
+            orders.append(self.order())
 
             # draw the scene
-            if self.gui:
-                self.draw()
-                self.fps_limiter.tick(self.fps)
+            if self.gui: self.draw()
 
             step += 1
 
         if self.gui: pygame.quit()
+
+        return orders
 
 
 class Particle:
@@ -134,14 +145,28 @@ class Particle:
         self.wrap()
 
 
+def plot_order(orders):
+    for order in orders:
+        plt.plot(list(range(len(order))), order)
+
+    plt.xlabel('step')
+    plt.ylabel('average normalized velocity')
+
+    plt.savefig('results/test.png')
+    plt.show()
+
+
 def main():
     np.random.seed(0)  # for reproducability
 
     scene = Scene(
         w=600, h=600, N=200, cohesion=100, seperation=30, alignment=1, speed=5, interaction_radius=100,
-        gui=True, fps=30
+        gui=False, fps=30
     )
-    scene.run(num_steps=np.inf)
+
+    repetitions = 10
+    orders = [scene.run() for _ in range(10)]
+    plot_order(orders)
 
 
 if __name__ == "__main__":

@@ -1,5 +1,7 @@
 let Scene = {
-	w: 600, h: 600, swarm: [],
+	w: 600,
+	h: 600,
+	swarm: [],
 	neighbours(x) {
 		let r = []
 		for (let p of this.swarm) {
@@ -12,20 +14,24 @@ let Scene = {
 }
 
 class Particle {
+
 	constructor() {
 		this.pos = createVector(random(0, Scene.w), random(0, Scene.h))
 		this.dir = p5.Vector.random2D()
 	}
+
 	wrap() {
 		if (this.pos.x < 0) this.pos.x += Scene.w
 		if (this.pos.y < 0) this.pos.y += Scene.h
 		if (this.pos.x > Scene.w) this.pos.x -= Scene.w
 		if (this.pos.y > Scene.h) this.pos.y -= Scene.h
 	}
+
 	draw() {
 		fill(0)
 		ellipse(this.pos.x, this.pos.y, 5, 5)
 	}
+
 	step() {
 		let N = Scene.neighbours(this.pos),
 			avg_sin = 0, avg_cos = 0,
