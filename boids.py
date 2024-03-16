@@ -197,7 +197,19 @@ def plot_neighbours(neighbours):
 
     plt.legend()
 
-    plt.savefig('results/test_neighbours.png')
+    plt.savefig('results/test_neighbours_gaussian.png')
+    plt.show()
+
+    step = 30
+    plt.boxplot([np.sqrt(sum(neighbours[:, t], [])) for t in range(0, neighbours.shape[1], step)])
+    # plt.xticks(range(0, neighbours.shape[1], step))
+
+    plt.xlabel(f'step x {step}')
+    plt.ylabel('nearest neighbour distance')
+
+    plt.legend()
+
+    plt.savefig('results/test_neighbours_boxplot.png')
     plt.show()
 
 
@@ -230,7 +242,7 @@ def run_repeated(
 
     return (
         np.array(results['orders'].values()),
-        np.array(results['neighbours'].values(), dtype=object),
+        np.array(results['neighbours'].values(), dtype=object),  # this array is inhomogeneous
     )
 
 
