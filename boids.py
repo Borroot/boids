@@ -35,15 +35,27 @@ class Scene:
             self.fps = fps
             self.fps_limiter = pygame.time.Clock()
 
-    def neighbours(self, p1):
-        return [
-            p2 for p2 in self.swarm
-            if (p1.pos.x - p2.pos.x) ** 2 + (p1.pos.y - p2.pos.y) ** 2 <= self.interaction_radius_squared
-        ]
+    def neighbours_of(self, p1):
+        neighbours = []
+        distances = []
+
+        for p2 in self.swarm:
+            distance = (p1.pos.x - p2.pos.x) ** 2 + (p1.pos.y - p2.pos.y) ** 2
+            if distance <= self.interaction_radius_squared:
+                neighbours.append(p2)
+                distances.append(distance)
+
+        return neighbours, distances
 
     def step(self):
+        neighbour_distances = []
+
         for particle in self.swarm:
-            particle.step(self.neighbours(particle), self.cohesion, self.seperation, self.alignment, self.speed)
+            neighbours, distances = self.neighbours_of(particle)
+            particle.step(neighbours, self.cohesion, self.seperation, self.alignment, self.speed)
+            neighbour_distances.append(distances)
+
+        return sum(neighbour_distances, [])
 
     def draw(self):
         self.screen.fill((255, 255, 255))
@@ -72,6 +84,7 @@ class Scene:
         interrupt = False
         step = 0
 
+        neighbours = []
         orders = []
 
         while step < num_steps and not interrupt:
@@ -79,7 +92,7 @@ class Scene:
             if self.gui and self.check_interrupt(): interrupt = True
 
             # update the scene
-            self.step()
+            neighbours.append(self.step())
             orders.append(self.order())
 
             # draw the scene
@@ -90,10 +103,11 @@ class Scene:
         if self.gui: pygame.quit()
 
         if process_id is not None:
-            results[process_id] = orders
+            results['orders'][process_id] = orders
+            results['neighbours'][process_id] = neighbours
             return
 
-        return orders
+        return orders, neighbours
 
 
 class Particle:
@@ -159,14 +173,31 @@ def plot_order(orders):
 
     # plot the mean and std
     plt.plot(mean, label='mean', color='tab:red')
-    plt.fill_between(np.arange(0, len(orders[0])), mean - std, mean + std, alpha=0.30, label='std', color='tab:red')
+    plt.fill_between(np.arange(0, len(mean)), mean - std, mean + std, alpha=0.3, label='std', color='tab:red')
 
     plt.xlabel('step')
     plt.ylabel('average normalized velocity')
 
     plt.legend()
 
-    plt.savefig('results/test.png')
+    plt.savefig('results/test_orders.png')
+    plt.show()
+
+
+def plot_neighbours(neighbours):
+    # note we do a sqrt because the distances are squared
+    mean = np.array([np.mean(np.sqrt(sum(neighbours[:, t], []))) for t in range(neighbours.shape[1])])
+    std = np.array([np.std(np.sqrt(sum(neighbours[:, t], []))) for t in range(neighbours.shape[1])])
+
+    plt.plot(mean, label='mean', color='tab:red')
+    plt.fill_between(np.arange(0, len(mean)), mean - std, mean + std, alpha=0.3, label='std', color='tab:red')
+
+    plt.xlabel('step')
+    plt.ylabel('nearest neighbour distance')
+
+    plt.legend()
+
+    plt.savefig('results/test_neighbours.png')
     plt.show()
 
 
@@ -176,12 +207,16 @@ def run_repeated(
 ):
     manager = mp.Manager()
     results = manager.dict()
+
+    results['neighbours'] = manager.dict()
+    results['orders'] = manager.dict()
+
     jobs = []
 
     scenes = [
         Scene(
-            w=600, h=600, N=200, cohesion=100, seperation=30, alignment=1, speed=5, interaction_radius=100,
-            gui=False, fps=30
+            w=w, h=h, N=N, cohesion=cohesion, seperation=seperation, alignment=alignment, speed=speed,
+            interaction_radius=interaction_radius, gui=gui, fps=fps, draw_size=draw_size,
         ) for _ in range(repetitions)
     ]
 
@@ -193,17 +228,22 @@ def run_repeated(
     for process in jobs:
         process.join()
 
-    return results.values()
+    return (
+        np.array(results['orders'].values()),
+        np.array(results['neighbours'].values(), dtype=object),
+    )
 
 
 def main():
     np.random.seed(0)  # for reproducability
 
-    orders = run_repeated(
+    orders, neighbours = run_repeated(
         w=600, h=600, N=200, cohesion=100, seperation=30, alignment=1, speed=5, interaction_radius=100,
         gui=False, fps=30
     )
-    plot_order(orders)
+
+    # plot_order(orders)
+    plot_neighbours(neighbours)
 
 
 if __name__ == "__main__":
