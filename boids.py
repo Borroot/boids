@@ -173,7 +173,10 @@ def plot_order(orders):
 
     # plot the mean and std
     plt.plot(mean, label='mean', color='tab:red')
-    plt.fill_between(np.arange(0, len(mean)), mean - std, mean + std, alpha=0.3, label='std', color='tab:red')
+    plt.fill_between(
+        np.arange(0, len(mean)), mean - std, mean + std,
+        alpha=0.3, label='std', color='tab:red'
+    )
 
     plt.xlabel('step')
     plt.ylabel('average normalized velocity')
@@ -190,7 +193,10 @@ def plot_neighbours(neighbours):
     std = np.array([np.std(np.sqrt(sum(neighbours[:, t], []))) for t in range(neighbours.shape[1])])
 
     plt.plot(mean, label='mean', color='tab:red')
-    plt.fill_between(np.arange(0, len(mean)), mean - std, mean + std, alpha=0.3, label='std', color='tab:red')
+    plt.fill_between(
+        np.arange(0, len(mean)), mean - std, mean + std,
+        alpha=0.3, label='std', color='tab:red'
+    )
 
     plt.xlabel('step')
     plt.ylabel('nearest neighbour distance')
@@ -214,8 +220,8 @@ def plot_neighbours(neighbours):
 
 
 def run_repeated(
-    w, h, N, cohesion, seperation, alignment, speed, interaction_radius,
-    gui=True, fps=30, draw_size=5, num_steps=300, repetitions=mp.cpu_count(),
+    w, h, N, cohesion, seperation, alignment,speed, interaction_radius,
+    num_steps=300, repetitions=mp.cpu_count(),
 ):
     manager = mp.Manager()
     results = manager.dict()
@@ -227,15 +233,17 @@ def run_repeated(
 
     scenes = [
         Scene(
-            w=w, h=h, N=N, cohesion=cohesion, seperation=seperation, alignment=alignment, speed=speed,
-            interaction_radius=interaction_radius, gui=gui, fps=fps, draw_size=draw_size,
+            w=w, h=h, N=N, cohesion=cohesion, seperation=seperation, alignment=alignment,
+            speed=speed, interaction_radius=interaction_radius, gui=False
         ) for _ in range(repetitions)
     ]
 
     for process_id in range(repetitions):
-        process = mp.Process(target=scenes[process_id].run, args=(num_steps, process_id, results))
-        jobs.append(process)
-        process.start()
+        jobs.append(mp.Process(
+            target=scenes[process_id].run,
+            args=(num_steps, process_id, results)
+        ))
+        jobs[-1].start()
 
     for process in jobs:
         process.join()
@@ -246,16 +254,40 @@ def run_repeated(
     )
 
 
+def abc(
+    w, h, N, abc_N, epsilons, prior_cohesion, prior_seperation, prior_alignment,
+    speed, interaction_radius, num_steps=300, repetitions=mp.cpu_count(),
+):
+    pass
+
+
 def main():
     np.random.seed(0)  # for reproducability
 
-    orders, neighbours = run_repeated(
-        w=600, h=600, N=200, cohesion=100, seperation=30, alignment=1, speed=5, interaction_radius=100,
-        gui=False, fps=30
-    )
+    # run multiple experiments
+    # orders, neighbours = run_repeated(
+    #     w=600, h=600, N=200, cohesion=100, seperation=30, alignment=1,
+    #     speed=5, interaction_radius=100,
+    # )
 
     # plot_order(orders)
-    plot_neighbours(neighbours)
+    # plot_neighbours(neighbours)
+
+    # run a single trial with gui
+    # scene = Scene(
+    #     w=600, h=600, N=15, cohesion=100, seperation=30, alignment=1,
+    #     speed=5, interaction_radius=100, gui=True, fps=30
+    # )
+    # scene.run(num_steps=np.inf)
+
+    # run abc
+    abc(
+        w=600, h=600, abc_N=20, N=15, speed=5, interaction_radius=100,
+        prior_cohesion=lambda n: np.random.uniform(1, 1000, n),
+        prior_seperation=lambda n: np.random.uniform(1, 100, n),
+        prior_alignment=lambda n: np.random.uniform(0.1, 100, n),
+        epsilons=np.linspace(0.5, 0.9, 10),
+    )
 
 
 if __name__ == "__main__":
