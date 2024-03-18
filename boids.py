@@ -140,7 +140,8 @@ class Particle:
 
             if neighbour != self:
                 away = self.pos - neighbour.pos
-                away /= away.magnitude_squared()  # normalize
+                try: away /= away.magnitude_squared()  # normalize
+                except ZeroDivisionError: away = pygame.Vector2(0, 0)
                 avg_away += away
 
         # take the mean
@@ -208,7 +209,7 @@ def plot_neighbours(neighbours):
 
     step = 30
     plt.boxplot([np.sqrt(sum(neighbours[:, t], [])) for t in range(0, neighbours.shape[1], step)])
-    # plt.xticks(range(0, neighbours.shape[1], step))
+    # plt.xticks(range(0, neighbours.shape[1], step)) # FIXME xlabels
 
     plt.xlabel(f'step x {step}')
     plt.ylabel('nearest neighbour distance')
@@ -254,11 +255,78 @@ def run_repeated(
     )
 
 
-def abc(
-    w, h, N, abc_N, epsilons, prior_cohesion, prior_seperation, prior_alignment,
-    speed, interaction_radius, num_steps=300, repetitions=mp.cpu_count(),
+def mutate(variables, samples):
+    mutated_variables = {}
+    for variable_name, variable_props in variables.items():
+        mutated = np.random.normal(samples[variable_name], variable_props['sigma'])
+        while not variable_props['valid'](mutated):
+            mutated = np.random.normal(samples[variable_name], variable_props['sigma'])
+        mutated_variables[variable_name] = mutated
+    return mutated_variables
+
+
+def sample_priors(variables):
+    return {
+        variable_name: variable_function['prior'](1)[0]
+        for variable_name, variable_function in variables.items()
+    }
+
+
+def accept(orders, epsilon, n=50):
+    # check the mean of the last n values over all runs > epsilon
+    return np.mean(orders[:, -n:]) > epsilon
+
+
+def create_population(
+    epsilon, w, h, N, abc_N, variables, speed, interaction_radius, num_steps, repetitions
 ):
-    pass
+    accepted = []
+    while len(accepted) < abc_N:
+        variable_samples = sample_priors(variables)
+        orders, _ = run_repeated(
+            w, h, N, speed=speed, interaction_radius=interaction_radius, **variable_samples
+        )
+
+        if accept(orders, epsilon):
+            accepted.append(variable_samples)
+
+    return accepted
+
+
+def mutate_population(
+    population, epsilon, w, h, N, abc_N, variables, speed, interaction_radius, num_steps, repetitions
+):
+    accepted = []
+    while len(accepted) < abc_N:
+        variable_samples = mutate(variables, np.random.choice(population))
+        orders, _ = run_repeated(
+            w, h, N, speed=speed, interaction_radius=interaction_radius, **variable_samples
+        )
+
+        if accept(orders, epsilon):
+            accepted.append(variable_samples)
+
+    return accepted
+
+
+def abc(
+    w, h, N, abc_N, epsilons, variables, speed, interaction_radius,
+    num_steps=300, repetitions=mp.cpu_count(),
+):
+    print(f'abc: creating the initial population with e={epsilons[0]}')
+    populations = [create_population(
+        epsilons[0], w, h, N, abc_N, variables,speed,
+        interaction_radius, num_steps, repetitions
+    )]
+
+    for index, epsilon in enumerate(epsilons[1:]):
+        print(f'abc: mutating population with e={epsilon:.3f} ({index + 1}/{len(epsilons) - 1})')
+        populations.append(mutate_population(
+            populations[-1], epsilon, w, h, N, abc_N, variables, speed,
+            interaction_radius, num_steps, repetitions
+        ))
+
+    return populations
 
 
 def main():
@@ -275,19 +343,44 @@ def main():
 
     # run a single trial with gui
     # scene = Scene(
-    #     w=600, h=600, N=15, cohesion=100, seperation=30, alignment=1,
+    #     w=600, h=600, N=200, cohesion=100, seperation=30, alignment=1,
     #     speed=5, interaction_radius=100, gui=True, fps=30
     # )
     # scene.run(num_steps=np.inf)
 
     # run abc
-    abc(
+    populations = abc(
         w=600, h=600, abc_N=20, N=15, speed=5, interaction_radius=100,
-        prior_cohesion=lambda n: np.random.uniform(1, 1000, n),
-        prior_seperation=lambda n: np.random.uniform(1, 100, n),
-        prior_alignment=lambda n: np.random.uniform(0.1, 100, n),
-        epsilons=np.linspace(0.5, 0.9, 10),
+        epsilons=np.linspace(0.5, 0.95, 10),
+        variables={
+            'cohesion': {
+                'prior': lambda n: np.random.uniform(1, 100, n),
+                'valid': lambda x: 1 < x < 100,
+                'sigma': 10,
+            },
+            'seperation': {
+                'prior': lambda n: np.random.uniform(10, 50, n),
+                'valid': lambda x: 10 < x < 50,
+                'sigma': 10,
+            },
+            'alignment': {
+                'prior': lambda n: np.random.uniform(0.1, 1.5, n),
+                'valid': lambda x: 0.1 < x < 1.5,
+                'sigma': 0.4,
+            },
+        }
     )
+    for population in populations[-1:]:
+        print(*population, sep='\n')
+        print()
+
+        for accepted in population[:3]:
+            # run a single trial with gui
+            scene = Scene(
+                w=600, h=600, N=15, **accepted, speed=5, interaction_radius=100, gui=True, fps=30
+            )
+            orders, _ = scene.run(num_steps=300)
+            plot_order(np.array([orders]))
 
 
 if __name__ == "__main__":
