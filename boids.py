@@ -342,45 +342,45 @@ def main():
     # plot_neighbours(neighbours)
 
     # run a single trial with gui
-    # scene = Scene(
-    #     w=600, h=600, N=200, cohesion=100, seperation=30, alignment=1,
-    #     speed=5, interaction_radius=100, gui=True, fps=30
-    # )
-    # scene.run(num_steps=np.inf)
+    scene = Scene(
+        w=600, h=600, N=200, cohesion=100, seperation=30, alignment=1,
+        speed=5, interaction_radius=100, gui=True, fps=30
+    )
+    scene.run(num_steps=np.inf)
 
     # run abc
-    populations = abc(
-        w=600, h=600, abc_N=20, N=15, speed=5, interaction_radius=100,
-        epsilons=np.linspace(0.5, 0.95, 10),
-        variables={
-            'cohesion': {
-                'prior': lambda n: np.random.uniform(1, 100, n),
-                'valid': lambda x: 1 < x < 100,
-                'sigma': 10,
-            },
-            'seperation': {
-                'prior': lambda n: np.random.uniform(10, 50, n),
-                'valid': lambda x: 10 < x < 50,
-                'sigma': 10,
-            },
-            'alignment': {
-                'prior': lambda n: np.random.uniform(0.1, 1.5, n),
-                'valid': lambda x: 0.1 < x < 1.5,
-                'sigma': 0.4,
-            },
-        }
-    )
-    for population in populations[-1:]:
-        print(*population, sep='\n')
-        print()
+    # populations = abc(
+    #     w=600, h=600, abc_N=20, N=15, speed=5, interaction_radius=100,
+    #     epsilons=np.linspace(0.5, 0.95, 10),
+    #     variables={
+    #         'cohesion': {
+    #             'prior': lambda n: np.random.uniform(1, 100, n),
+    #             'valid': lambda x: 1 < x < 100,
+    #             'sigma': 10,
+    #         },
+    #         'seperation': {
+    #             'prior': lambda n: np.random.uniform(10, 50, n),
+    #             'valid': lambda x: 10 < x < 50,
+    #             'sigma': 10,
+    #         },
+    #         'alignment': {
+    #             'prior': lambda n: np.random.uniform(0.1, 1.5, n),
+    #             'valid': lambda x: 0.1 < x < 1.5,
+    #             'sigma': 0.4,
+    #         },
+    #     }
+    # )
+    # for population in populations[-1:]:
+    #     print(*population, sep='\n')
+    #     print()
 
-        for accepted in population[:3]:
-            # run a single trial with gui
-            scene = Scene(
-                w=600, h=600, N=15, **accepted, speed=5, interaction_radius=100, gui=True, fps=30
-            )
-            orders, _ = scene.run(num_steps=300)
-            plot_order(np.array([orders]))
+    #     for accepted in population[:3]:
+    #         # run a single trial with gui
+    #         scene = Scene(
+    #             w=600, h=600, N=15, **accepted, speed=5, interaction_radius=100, gui=True, fps=30
+    #         )
+    #         orders, _ = scene.run(num_steps=300)
+    #         plot_order(np.array([orders]))
 
 
 if __name__ == "__main__":
